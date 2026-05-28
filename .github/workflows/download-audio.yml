@@ -1,0 +1,36 @@
+name: دانلود صوتی روشنگری دینی
+
+on:
+  workflow_dispatch:     # دکمه دستی برای اجرا
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ورود به مخزن
+        uses: actions/checkout@v4
+
+      - name: نصب ابزارها
+        run: |
+          sudo apt update
+          sudo apt install -y ffmpeg
+          pip install -U yt-dlp
+
+      - name: دانلود فقط صدا (کیفیت خیلی پایین)
+        run: |
+          yt-dlp -x --audio-format mp3 \
+                 --audio-quality 9 \           # کیفیت خیلی پایین (تقریبا ۳۲kbps)
+                 --embed-metadata \
+                 --concurrent-fragments 4 \
+                 --retries 10 \
+                 -o "Roshangari_Audio/%(playlist)s/%(upload_date)s - %(title)s.%(ext)s" \
+                 "https://www.youtube.com/@roshangaridini/videos"
+
+      - name: ذخیره تغییرات
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Roshangari_Audio/
+          git commit -m "به‌روزرسانی فایل‌های صوتی - $(date)" || echo "تغییر جدیدی نبود"
+          git push
