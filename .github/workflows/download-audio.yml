@@ -20,7 +20,7 @@ jobs:
       - name: دانلود فقط صدا (کیفیت خیلی پایین)
         run: |
           yt-dlp -x --audio-format mp3 \
-                 --audio-quality 9 \           # کیفیت خیلی پایین (تقریبا ۳۲kbps)
+                 --audio-quality 9 \
                  --embed-metadata \
                  --concurrent-fragments 4 \
                  --retries 10 \
