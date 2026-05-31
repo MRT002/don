@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       links:
-        description: 'لینک‌های یوتیوب (هر لینک در یک خط)'
+        description: 'لینک‌های یوتیوب'
         required: true
         type: textarea
 
@@ -12,7 +12,6 @@ jobs:
   download-and-save:
     runs-on: ubuntu-latest
 
-    # دسترسی لازم برای پوش کردن فایل‌ها به مخزن
     permissions:
       contents: write
 
@@ -26,12 +25,23 @@ jobs:
           with-ffmpeg: true
 
       - name: Download Audio (64kbps MP3)
+        env:
+          YOUTUBE_LINKS: ${{ github.event.inputs.links }}
         run: |
-          echo "${{ github.event.inputs.links }}" > links.txt
+          # ذخیره لینک‌ها در یک فایل با حفظ دقیق شکستگی خطوط
+          printf "%s" "$YOUTUBE_LINKS" > raw_links.txt
           
+          # تمیزکاری و آماده‌سازی لینک‌ها
+          sed -i 's/\r//g' raw_links.txt
+          
+          # دانلود تک به تک بدون استفاده از آپشن -a که حساس به فرمت فایل است
           while IFS= read -r line || [ -n "$line" ]; do
+            # حذف فاصله‌های خالی احتمالی اطراف لینک
             url=$(echo "$line" | xargs)
-            if [ ! -z "$url" ]; then
+            
+            # بررسی اینکه خط خالی نباشد و با http شروع شود
+            if [[ ! -z "$url" && "$url" == http* ]]; then
+              echo "در حال دانلود: $url"
               yt-dlp \
                 -f "bestaudio/best" \
                 --extract-audio \
@@ -42,23 +52,21 @@ jobs:
                 --no-warnings \
                 "$url"
             fi
-          done < links.txt
+          done < raw_links.txt
 
-          # پاک کردن فایل موقت لینک‌ها
-          rm links.txt
+          rm -f raw_links.txt
 
       - name: Commit and Push to Repository
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-          # اضافه کردن تمام فایل‌های mp3 با هر اسمی که دارن
+          # اضافه کردن تمام فایل‌های mp3 با هر اسمی که دارند
           git add *.mp3
           
-          # بررسی اینکه آیا فایل جدیدی اضافه شده یا نه، برای جلوگیری از ارور
           if git diff --cached --quiet; then
-            echo "هیچ فایل جدیدی دانلود نشد."
+            echo "هیچ فایل جدیدی برای ذخیره پیدا نشد."
           else
-            git commit -m "دانلود خودکار صوت‌های یوتیوب"
+            git commit -m "ذخیره خودکار فایل‌های صوتی یوتیوب"
             git push
           fi
