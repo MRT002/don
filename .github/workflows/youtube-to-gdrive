@@ -1,0 +1,46 @@
+name: YouTube Audio → Google Drive
+
+on:
+  workflow_dispatch:
+    inputs:
+      links_file:
+        description: 'نام فایل لینک‌ها'
+        required: false
+        default: 'links.txt'
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ==================== دانلود صوت 64kbps ====================
+      - name: Setup yt-dlp + FFmpeg
+        uses: AnimMouse/setup-yt-dlp@v3
+
+      - name: Setup FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+
+      - name: دانلود صوت از links.txt
+        run: |
+          yt-dlp \
+            -f "bestaudio/best" \
+            --extract-audio \
+            --audio-format mp3 \
+            --audio-quality 64K \
+            --output "%(title)s.%(ext)s" \
+            --ignore-errors \
+            --no-warnings \
+            -a ${{ github.event.inputs.links_file || 'links.txt' }}
+
+      # ==================== آپلود به گوگل درایو ====================
+      - name: Upload to Google Drive
+        uses: willo32/google-drive-upload-action@v1
+        with:
+          target: "*.mp3"
+          credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
+          parent_folder_id: ${{ secrets.GDRIVE_FOLDER_ID }}
+          # zip_files: true           # اگر خواستی همه فایل‌ها رو زیپ کنه، این خط رو uncomment کن
+          # zip_name: audios.zip
