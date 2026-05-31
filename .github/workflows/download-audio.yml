@@ -1,36 +1,76 @@
-name: دانلود صوتی روشنگری دینی
+name: Download YouTube Audio
 
 on:
-  workflow_dispatch:     # دکمه دستی برای اجرا
+  workflow_dispatch:
+    inputs:
+      links:
+        description: 'لینک‌های یوتیوب'
+        required: true
+        type: textarea
 
 jobs:
-  download:
+  download-and-save:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
-      - name: ورود به مخزن
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: نصب ابزارها
-        run: |
-          sudo apt update
-          sudo apt install -y ffmpeg
-          pip install -U yt-dlp
+      - name: Install yt-dlp
+        uses: AnimMouse/setup-yt-dlp@v3
+        with:
+          with-ffmpeg: true
 
-      - name: دانلود فقط صدا (کیفیت خیلی پایین)
+      - name: Download Audio (64kbps MP3)
+        env:
+          RAW_INPUT: ${{ github.event.inputs.links }}
         run: |
-          yt-dlp -x --audio-format mp3 \
-                 --audio-quality 9 \
-                 --embed-metadata \
-                 --concurrent-fragments 4 \
-                 --retries 10 \
-                 -o "Roshangari_Audio/%(playlist)s/%(upload_date)s - %(title)s.%(ext)s" \
-                 "https://www.youtube.com/@roshangaridini/videos"
+          # ذخیره ورودی خام
+          printf "%s" "$RAW_INPUT" > raw.txt
+          
+          # حذف عبارت \n متنی، کاراکترهای مخفی و خطوط اضافه
+          sed -i 's/\\n/\n/g' raw.txt
+          sed -i 's/\r//g' raw.txt
+          
+          # استخراج لینک‌های تمیز و ذخیره در فایل نهایی
+          grep -o 'https://www.youtube.com/watch?[^[:space:]]*' raw.txt | sed 's/\\n//g' > clean_links.txt
 
-      - name: ذخیره تغییرات
+          # دانلود تک تک لینک‌ها
+          while IFS= read -r url || [ -n "$url" ]; do
+            # حذف حرف n یا کاراکترهای خراب احتمالی از آخر لینک مجدداً برای اطمینان
+            url=$(echo "$url" | sed 's/\\n//g' | xargs)
+            
+            if [[ ! -z "$url" && "$url" == http* ]]; then
+              echo "در حال دانلود لینک تمیز شده: $url"
+              yt-dlp \
+                -f "bestaudio/best" \
+                --extract-audio \
+                --audio-format mp3 \
+                --audio-quality 64K \
+                --output "%(title)s.%(ext)s" \
+                --ignore-errors \
+                --no-warnings \
+                "$url"
+            fi
+          done < clean_links.txt
+
+          # پاک کردن فایل‌های موقت
+          rm -f raw.txt clean_links.txt
+
+      - name: Commit and Push to Repository
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Roshangari_Audio/
-          git commit -m "به‌روزرسانی فایل‌های صوتی - $(date)" || echo "تغییر جدیدی نبود"
-          git push
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # اضافه کردن تمام فایل‌های صوتی با هر اسمی که دارند
+          git add *.mp3
+          
+          if git diff --cached --quiet; then
+            echo "هیچ فایل جدیدی دانلود نشد."
+          else
+            git commit -m "ذخیره خودکار فایل‌های صوتی یوتیوب"
+            git push
+          fi
