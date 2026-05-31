@@ -1,34 +1,33 @@
-name: دانلود صوت 64kbps از یوتیوب
+name: Download YouTube Audio
 
 on:
   workflow_dispatch:
     inputs:
       links:
-        description: 'لینک‌های یوتیوب (هر لینک یک خط)'
+        description: 'لینک‌های یوتیوب (هر لینک در یک خط)'
         required: true
         type: textarea
 
 jobs:
-  download-audio:
+  download-and-upload:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: نصب yt-dlp و FFmpeg
+      - name: Install yt-dlp
         uses: AnimMouse/setup-yt-dlp@v3
+        with:
+          with-ffmpeg: true
 
-      - name: نصب FFmpeg
-        uses: FedericoCarboni/setup-ffmpeg@v3
-
-      - name: ذخیره لینک‌ها
+      - name: Save Links to File
         run: |
-          cat > links.txt << 'EOL'
-          ${{ inputs.links }}
-          EOL
+          cat << 'EOF' > links.txt
+          ${{ github.event.inputs.links }}
+          EOF
 
-      - name: دانلود صوت با کیفیت 64kbps
+      - name: Download Audio (64kbps MP3)
         run: |
           yt-dlp \
             -f "bestaudio/best" \
@@ -40,9 +39,10 @@ jobs:
             --no-warnings \
             -a links.txt
 
-      - name: آماده‌سازی برای دانلود (Artifact)
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: youtube-64kbps-audio
-          path: "*.mp3"
+          name: youtube-audio-files
+          path: |
+            *.mp3
           retention-days: 7
