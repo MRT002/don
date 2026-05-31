@@ -1,0 +1,42 @@
+name: Download YouTube Audio from TXT
+
+on:
+  workflow_dispatch:  # دستی اجرا کنی
+  # schedule:
+  #   - cron: '0 3 * * *'   # مثلاً هر روز ساعت ۳ صبح
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup yt-dlp
+        uses: AnimMouse/setup-yt-dlp@v3
+
+      - name: Install FFmpeg (برای بهترین کیفیت صوتی)
+        uses: FedericoCarboni/setup-ffmpeg@v3
+
+      - name: Download Audio from links.txt
+        run: |
+          yt-dlp \
+            -f "bestaudio/best" \
+            --extract-audio \
+            --audio-format mp3 \
+            --audio-quality 64K \     # دقیقاً 64 kbps
+            --output "%(title)s.%(ext)s" \
+            --ignore-errors \
+            --no-warnings \
+            -a links.txt
+        env:
+          # اگر نیاز به کوکی داری (برای ویدیوهای خصوصی):
+          # YT_DLP_COOKIES: ${{ secrets.YT_COOKIES }}
+
+      - name: Upload downloaded files as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-audio-downloads
+          path: ./*.mp3
+          retention-days: 7
